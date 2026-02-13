@@ -130,8 +130,8 @@ body {
 
 .star {
   position: absolute;
-  font-size: 7vh;
-  inset-block-start: -4vh;
+  font-size: 6vh;
+  inset-block-start: -3.75vh;
   color: yellow;
   text-shadow: 0px 0px 3px black;
   transition: transform 1s, opacity 1s;
