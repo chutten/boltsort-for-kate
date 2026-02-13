@@ -1,0 +1,185 @@
+:root {
+  background: linear-gradient(#211F53, #3B2199 25%, #3B2199 75%, #211F53);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  user-select: none;
+}
+
+body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  margin: 0;
+}
+
+.ui {
+  height: 10vh;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.button {
+  background-color: purple;
+  border: 2px outset;
+  color: white;
+  font-weight: bold;
+  font-size: 4vw;
+  width: 5vh;
+  height: 5vh;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.button:active {
+  border-style: inset;
+}
+
+.level {
+  flex: 1;
+
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: center;
+  align-content: center;
+  padding: 1vw;
+}
+
+.bolt {
+  width: 20%;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: end;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 35%,
+    white 45% 55%,
+    rgba(0, 0, 0, 0) 65%
+  ); /* TODO: do a better bolt bg */
+  padding-bottom: 1%;
+}
+
+.bolt { /* TODO: this is a 4h bolt */
+  height: calc(2 / 15 * 100vh); /* 2cm of the 15cm height of my phone */
+}
+
+@property --gear-line-pos {
+  syntax: "<percentage>";
+  initial-value: 0%;
+  inherits: false;
+}
+
+.nut {
+  width: 50%;
+  height: 11%; /* Aiming to support 7h bolts eventually */
+  margin: 1% 0;
+  background-image: repeating-linear-gradient(
+    to right,
+    black var(--gear-line-pos) calc(var(--gear-line-pos) + 2%),
+    rgba(0, 0, 0, 0) calc(var(--gear-line-pos) + 2%) calc(var(--gear-line-pos) + 33%)
+  );
+  transition:
+    transform 150ms,
+    --gear-line-pos 150ms;
+}
+
+.nut.selected {
+  transform: translateY(-50%);
+  --gear-line-pos: 16%; /* Set by eye, might be translateY's multiple of the width of the repeating-linear-gradient */
+}
+
+#score {
+  height: 100%;
+  --score-width: calc(4 / 7 * 100vw); /* Measured on my phone to be about 4cm of the 7cm width */
+  width: var(--score-width);
+  border-radius: 1em;
+  background-color: rgba(0, 0, 0, 0.2);
+  position: relative; /* Make a stacking context for inner children */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.score-bar {
+  border-radius: 1vh;
+  height: 2vh;
+}
+
+.outer.score-bar {
+  position: relative; /* stacking context for .star */
+  width: 80%;
+  background-color: grey;
+}
+
+.inner.score-bar {
+  transition: width 150ms;
+  background-color: yellow;
+}
+
+.star {
+  position: absolute;
+  font-size: 7vh;
+  inset-block-start: -4vh;
+  color: yellow;
+  text-shadow: 0px 0px 3px black;
+  transition: transform 1s, opacity 1s;
+}
+
+.star.lost {
+  transform: translateY(5vh) scale(0.25);
+  opacity: 0;
+}
+
+.win .star {
+  transform: translateX(40vw) scale(10);
+  opacity: 0;
+}
+
+.star:nth-child(2) {
+  inset-inline-start: 0;
+}
+
+.star:nth-child(3) {
+  inset-inline-start: calc(var(--score-width) / 6);
+}
+
+.star:nth-child(4) {
+  inset-inline-start: calc(var(--score-width) / 3);
+}
+
+.moves {
+  color: white; /* TODO: Better colours */
+  font-size: 2vh;
+}
+
+#game-score {
+  height: 100%;
+  width: 10vh;
+  background-color: rgba(0, 0, 0, 0.2);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 4vh;
+  color: white; /* TODO: Better colours */
+}
+
+#game-score :not(#game-score-number) {
+  color: yellow; /* TODO: Better colours */
+}
+
+.win #game-score :not(#game-score-number) {
+  transform: rotate(360deg);
+  transition: transform 1.2s;
+}
