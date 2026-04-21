@@ -27,6 +27,10 @@ class Level {
       bolt.dom.addEventListener("click", this.#onclick.bind(this));
       this.#dom.appendChild(bolt.dom);
     }
+    const extraBolt = new Bolt(1, true /* aLocked */);
+    this.#bolts.push(extraBolt);
+    extraBolt.dom.addEventListener("click", this.#onclick.bind(this));
+    this.#dom.appendChild(extraBolt.dom);
     // assert: aNumColours < Object.keys(Colour.COLOURS).length
     let colours = Object.keys(Colour.COLOURS).slice(0, aNumColours);
     let allNuts = [];
@@ -72,19 +76,52 @@ class Level {
     this.#onboltclick(ev.currentTarget.gameobj);
   }
 
+  static get UNLOCK_COST() {
+    return 5; // Number of stars needed to unlock a locked bolt.
+    // Chosen by vibes and minimal thought. May need tuning.
+  }
+
   #onboltclick(aBolt) {
     // Bolt state machine:
-    // Click on bolt when no selected bolt? Select clicked bolt
+    // Level complete? Do nothing.
+    // Click on bolt when no selected bolt?
+    //   - if locked, offer to unlock clicked bolt
+    //   - if !locked, select clicked bolt
     // Click on a selected bolt? Deselect selected (and clicked) bolt
-    // Click on bolt when selected bolt? Attempt move, deselect selected bolt
-    if (this.#bolts.every(bolt => !bolt.selected)) {
-      console.info(`No selected bolt. Selecting bolt ${aBolt}.`);
-      aBolt.select();
+    // Click on non-locked bolt when selected bolt? Attempt move, deselect selected bolt
+    if (this.#bolts.every(bolt => { return bolt.isEmpty() || bolt.isComplete(); })) {
+      console.info(`Level is complete. Ignoring bolt click.`);
       return;
+    }
+    if (this.#bolts.every(bolt => !bolt.selected)) {
+      if (aBolt.locked) {
+        console.info(`Bolt is locked. Offering to unlock.`);
+        const availableStars = parseInt(localStorage.getItem("game.score") ?? 0);
+        if (availableStars < Level.UNLOCK_COST) {
+          console.info(`Insufficient stars ${availableStars} < ${Level.UNLOCK_COST}. No offer.`);
+          alert(`Sorry, you need at least ${Level.UNLOCK_COST} stars to unlock this bolt.`);
+          return;
+        }
+        const offerAccepted = window.confirm(`Bolt is locked. Spend ${Level.UNLOCK_COST}★ to unlock?`);
+        if (offerAccepted) {
+          localStorage.setItem("game.score", availableStars - Level.UNLOCK_COST);
+          updateGameScoreUI();
+          aBolt.unlock();
+        }
+        return;
+      } else {
+        console.info(`No selected bolt. Selecting bolt ${aBolt}.`);
+        aBolt.select();
+        return;
+      }
     }
     if (aBolt.selected) {
       console.info(`Click on selected bolt. Deselecting bolt ${aBolt}.`);
       aBolt.deselect();
+      return;
+    }
+    if (aBolt.locked) {
+      console.info(`Target bolt's locked. Ignoring click.`);
       return;
     }
     console.info(`Click on unselected bolt ${aBolt}.`);
@@ -215,23 +252,31 @@ class Level {
 
 class Bolt {
   #height;
-  #enabled;
+  #locked; // If true, can't land nuts here without unlocking.
   #nuts; // Array at most `#height` in length, first element is the _top_ element.
   #selected;
-  #dom;
-  constructor(aHeight = 4, aEnabled = true) {
+  #dom; // DOM element of the larger interactive game box.
+  constructor(aHeight = 4, aLocked = false) {
     this.#height = aHeight;
-    this.#enabled = aEnabled;
+    this.#locked = aLocked;
     this.#nuts = new Array();
     this.#selected = false;
     this.#dom = document.createElement("div");
     this.#dom.className = "bolt";
     this.#dom.gameobj = this;
+    let thread = document.createElement("div");
+    thread.className = "thread";
+    thread.style.height = (aHeight * 15) + "%";
+    this.#dom.appendChild(thread);
+    let cap = document.createElement("div");
+    cap.className = "cap";
+    this.#dom.appendChild(cap);
+    this.#dom.classList.toggle("locked", this.#locked);
   }
 
   // Non-dom, non-selectedness cloning
   clone() {
-    let clone = new Bolt(this.#height, this.#enabled);
+    let clone = new Bolt(this.#height, this.#locked);
     clone.#nuts = this.#nuts.map(nut => nut.clone());
     return clone;
   }
@@ -239,6 +284,12 @@ class Bolt {
   restoreFrom(anotherBolt) {
     // Assert height
     this.#dom.innerHTML = ""; // fastest removeAllChildren
+    let thread = document.createElement("div");
+    thread.className = "thread";
+    this.#dom.appendChild(thread);
+    let cap = document.createElement("div");
+    cap.className = "cap";
+    this.#dom.appendChild(cap);
     this.#nuts = new Array();
     anotherBolt.#nuts.reverse().forEach(nut => {
       this.addNut(nut.colour);
@@ -259,6 +310,15 @@ class Bolt {
 
   get dom() {
     return this.#dom;
+  }
+
+  get locked() {
+    return this.#locked;
+  }
+
+  unlock() {
+    this.#locked = false;
+    this.#dom.classList.toggle("locked", this.#locked);
   }
 
   createNuts(aNutColours) {
@@ -298,7 +358,7 @@ class Bolt {
       return; // nothing to do
     }
     const topColour = this.#nuts[0].colour;
-    if (this.#nuts.length == this.#height && this.#nuts.every(nut => topColour == nut.colour)) {
+    if (this.#height > 1 && this.#nuts.length == this.#height && this.#nuts.every(nut => topColour == nut.colour)) {
       console.info(`Not selecting because all ${this.#height} nuts are ${topColour}.`);
       return;
     }
@@ -556,6 +616,7 @@ class Score {
 // - except SL2 had N - 1 colours
 // - SL3 had 3x bolts of 3 colours, 8h + 3x empty bolts 3h
 
+// TODO: Move this to Score? As a static?
 function updateGameScoreUI() {
   document.getElementById("game-score-number").textContent = localStorage.getItem("game.score") ?? 0;
 }

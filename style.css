@@ -56,22 +56,45 @@ body {
 }
 
 .bolt {
+  position: relative;
   width: 20%;
   display: flex;
   flex-direction: column-reverse;
   align-items: center;
   justify-content: end;
+}
+
+.thread {
+  position: absolute;
+  bottom: 0;
+  width: 40%;
+  height: 65%; /* This is overridden by JS to be 15% x height */
+  z-index: -1; /* stacking context rules puts abspos above flow children, so bg it */
   background: linear-gradient(
     to right,
-    rgba(0, 0, 0, 0) 35%,
-    white 45% 55%,
-    rgba(0, 0, 0, 0) 65%
-  ); /* TODO: do a better bolt bg */
-  padding-bottom: 1%;
+    rgba(0, 0, 0, 0) 15%,
+    white 30% 70%,
+    rgba(0, 0, 0, 0) 85%
+  );
+  border-radius: 40% 40% 0 0;
+}
+
+.cap {
+  width: 40%;
+  height: 5%;
+  margin-top: -1%; /* Cancel's the nuts' margin */
+  background: white; /* TODO: Prettier threads+cap. Some sort of metallic grey? SVG? */
+  border-radius: 10%; /* Chamfered */
 }
 
 .bolt { /* TODO: this is a 4h bolt */
   height: calc(2 / 15 * 100vh); /* 2cm of the 15cm height of my phone */
+}
+
+.bolt.locked::before {
+  content: '🔒';
+  position: absolute;
+  font-size: calc(1 / 15 * 100vh); /* Half of .bolt's own height */
 }
 
 @property --gear-line-pos {
@@ -89,6 +112,13 @@ body {
     black var(--gear-line-pos) calc(var(--gear-line-pos) + 2%),
     rgba(0, 0, 0, 0) calc(var(--gear-line-pos) + 2%) calc(var(--gear-line-pos) + 33%)
   );
+  /* TODO: Play around to get a good shadow animation
+  ), linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.5) var(--gear-line-pos),
+    rgba(0, 0, 0, 0) calc(var(--gear-line-pos) + 2%) calc(100% - var(--gear-line-pos) - 2%),
+    rgba(0, 0, 0, 0.5) calc(100% - var(--gear-line-pos))
+  ); */
   transition:
     transform 150ms,
     --gear-line-pos 150ms;
