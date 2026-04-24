@@ -141,11 +141,14 @@ class Level {
     if (moved) {
       this.#undo.push(clonebolts);
       document.getElementById("undo").classList.remove("disabled");
-      this.#score.moveTaken();
       if (this.#bolts.every(bolt => { return bolt.isEmpty() || bolt.isComplete(); })) {
         console.info(`You are winner! ${JSON.stringify(this.#bolts)}`);
         this.#onwin();
       }
+      // Still count the move if the user won, but wait until after the win is recorded.
+      // Otherwise we might short-change them a star if they won with a move
+      // on the threshold of losing a star.
+      this.#score.moveTaken();
     }
   }
 
