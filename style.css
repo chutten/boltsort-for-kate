@@ -129,6 +129,11 @@ body {
   --gear-line-pos: 16%; /* Set by eye, might be translateY's multiple of the width of the repeating-linear-gradient */
 }
 
+.nut.obscure {
+  background: transparent !important; /* !important to exceed specificity of on-element bgcolor */
+  outline: 3px dotted gray;
+}
+
 #score {
   height: 100%;
   --score-width: calc(4 / 7 * 100vw); /* Measured on my phone to be about 4cm of the 7cm width */

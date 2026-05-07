@@ -9,13 +9,15 @@
 //    - Possibly more difficult to craft the puzzle, or perhaps they just allow the randomness (like minesweeper)
 // - Starting L19, 9 bolts (still 4h) 7 colours (still maintaining colours = bolts - 2)
 // - L21 back to 7b 4h 5c for some reason?
+// - L22 9b 4h 7c
+// - L31 11b 4f 9c
 class Level {
   #bolts;
   #movesTaken;
   #dom;
   #score;
   #undo;
-  constructor(aNumBolts = 7, aBoltHeight = 4, aNumColours = 5) {
+  constructor(aNumBolts = 7, aBoltHeight = 4, aNumColours = 5, aObscureNuts = false) {
     this.#bolts = new Array();
     this.#movesTaken = 0;
     this.#dom = document.createElement("div");
@@ -31,8 +33,8 @@ class Level {
     this.#bolts.push(extraBolt);
     extraBolt.dom.addEventListener("click", this.#onclick.bind(this));
     this.#dom.appendChild(extraBolt.dom);
-    // assert: aNumColours < Object.keys(Colour.COLOURS).length
-    let colours = Object.keys(Colour.COLOURS).slice(0, aNumColours);
+    // assert: aNumColours < Colour.COLOURS.size
+    let colours = Array.from(Colour.COLOURS.keys()).slice(0, aNumColours);
     let allNuts = [];
     for (let h = 0; h < aBoltHeight; h++) {
       for (let c = 0; c < aNumColours; c++) {
@@ -48,7 +50,11 @@ class Level {
         }
       }
     }
-    this.#score = new Score();
+    if (aObscureNuts) {
+      this.#bolts.forEach(bolt => bolt.obscureNuts());
+    }
+    // Min moves ~= touching each nut once, except half the ones at the bottom of the pile
+    this.#score = new Score(aNumColours * aBoltHeight - Math.floor(aNumColours / 2));
     this.#undo = new Array();
     document.getElementById("undo").classList.add("disabled");
     document.getElementById("new-game").classList.add("disabled");
@@ -79,6 +85,11 @@ class Level {
   static get UNLOCK_COST() {
     return 5; // Number of stars needed to unlock a locked bolt.
     // Chosen by vibes and minimal thought. May need tuning.
+  }
+
+  // What difficulty of Level should it be given the number of scored stars?
+  static difficultyFor(aStars) {
+    return Math.floor(aStars / 10) + 1;
   }
 
   #onboltclick(aBolt) {
@@ -289,6 +300,7 @@ class Bolt {
     this.#dom.innerHTML = ""; // fastest removeAllChildren
     let thread = document.createElement("div");
     thread.className = "thread";
+    thread.style.height = (anotherBolt.#height * 15) + "%";
     this.#dom.appendChild(thread);
     let cap = document.createElement("div");
     cap.className = "cap";
@@ -296,7 +308,10 @@ class Bolt {
     this.#nuts = new Array();
     anotherBolt.#nuts.reverse().forEach(nut => {
       this.addNut(nut.colour);
+      this.#nuts[0].obscure = nut.obscure;
     });
+    this.#locked = anotherBolt.#locked;
+    this.#dom.classList.toggle("locked", this.#locked);
   }
 
   get nuts() {
@@ -354,27 +369,38 @@ class Bolt {
     return this.#selected;
   }
 
+  /* To select them, or unobscure them, or whatevs. */
+  #getTopNutsOfMatchingColour() {
+    if (!this.#nuts.length) {
+      return [];
+    }
+    const topColour = this.#nuts[0].colour;
+    let matchingNuts = [];
+    this.#nuts.every(nut => {
+      if (nut.colour == topColour) {
+        matchingNuts.push(nut);
+        return true;
+      }
+      return false;
+    });
+    return matchingNuts;
+  }
+
   /** e.g. User tapped on us and no other bolt was selected */
   select() {
     if (this.isEmpty() || this.#selected) {
       console.info(`Not selecting because empty? ${this.isEmpty()} selected? ${this.#selected}.`);
       return; // nothing to do
     }
-    const topColour = this.#nuts[0].colour;
-    if (this.#height > 1 && this.#nuts.length == this.#height && this.#nuts.every(nut => topColour == nut.colour)) {
-      console.info(`Not selecting because all ${this.#height} nuts are ${topColour}.`);
+    const selectableNuts = this.#getTopNutsOfMatchingColour();
+    if (this.#height > 1 && selectableNuts.length == this.#height) {
+      console.info(`Not selecting because all ${this.#height} nuts are ${selectableNuts[0].colour}.`);
       return;
     }
     this.#selected = true;
 
-    this.#nuts.every(nut => {
-      if (nut.colour == topColour) {
-        nut.select();
-        return true;
-      }
-      return false;
-    });
-    console.info(`Nuts of colour ${topColour} selected on ${this}.`);
+    selectableNuts.forEach(nut => nut.select());
+    console.info(`Nuts of colour ${selectableNuts[0].colour} selected on ${this}.`);
   }
 
   /** e.g. User tapped an empty space or asked for illegal move **/
@@ -387,6 +413,16 @@ class Bolt {
 
     this.#nuts.forEach(nut => nut.deselect());
     console.info(`Bolt ${this} deselected.`);
+  }
+
+  obscureNuts() {
+    this.#nuts.forEach(nut => nut.obscure = true);
+    this.unobscureTopNuts();
+  }
+
+  unobscureTopNuts() {
+    const topNuts = this.#getTopNutsOfMatchingColour();
+    topNuts.forEach(nut => nut.obscure = false);
   }
 
   static canMove(srcBolt, destBolt, allowUselessMoves) {
@@ -452,6 +488,7 @@ class Bolt {
       // TODO: Kick off some Animation or whatever
       moved = true;
     }
+    srcBolt.unobscureTopNuts();
     console.info(`Move complete. Anything moved? ${moved}`);
     return moved;
   }
@@ -461,17 +498,21 @@ class Nut {
   #colour;
   #selected;
   #dom;
+  #obscure;
   constructor(aColour) {
     this.#colour = aColour;
     this.#selected = false;
     this.#dom = document.createElement("div");
     this.#dom.className = "nut";
-    this.#dom.style.backgroundColor = Colour.COLOURS[aColour];
+    this.#dom.style.backgroundColor = Colour.COLOURS.get(aColour);
+    this.#obscure = false;
   }
 
   // non-DOM, non-selectedness cloning
   clone() {
-    return new Nut(this.#colour);
+    let clone = new Nut(this.#colour);
+    clone.#obscure = this.#obscure;
+    return clone;
   }
 
   toJSON() {
@@ -499,6 +540,15 @@ class Nut {
     this.#selected = false;
     this.#dom.classList.remove("selected");
   }
+
+  get obscure() {
+    return this.#obscure;
+  }
+
+  set obscure(aIsObscure) {
+    this.#obscure = aIsObscure;
+    this.#dom.classList.toggle("obscure", aIsObscure);
+  }
 }
 
 class Colour {
@@ -508,14 +558,26 @@ class Colour {
   static BLUE = "b";
   static YELLOW = "y";
   static GREY = "e";
+  static PURPLE = "u";
+  static PINK = "i";
+  static CYAN = "c";
+  static ORANGE = "o";
+  static BROWN = "r";
+  static FOREST_GREEN = "f";
 
-  static COLOURS = {
-    [Colour.RED]: "rgb(255, 0, 0)",
-    [Colour.GREEN]: "rgb(0, 255, 0)",
-    [Colour.BLUE]: "rgb(0, 0, 255)",
-    [Colour.YELLOW]: "rgb(255, 255, 0)",
-    [Colour.GREY]: "rgb(128, 128, 128)",
-  };
+  static COLOURS = new Map([
+    [[Colour.RED], "rgb(255, 0, 0)"],
+    [[Colour.GREEN], "rgb(0, 255, 0)"],
+    [[Colour.BLUE], "rgb(0, 0, 255)"],
+    [[Colour.YELLOW], "rgb(255, 255, 0)"],
+    [[Colour.GREY], "rgb(128, 128, 128)"],
+    [[Colour.PURPLE], "rgb(128, 0, 255)"],
+    [[Colour.PINK], "rgb(255, 128, 255)"],
+    [[Colour.CYAN], "rgb(0, 255, 255)"],
+    [[Colour.ORANGE], "rgb(255, 128, 0)"],
+    [[Colour.BROWN], "rgb(100, 50, 0)"],
+    [[Colour.FOREST_GREEN], "rgb(0, 100, 0)"],
+  ]);
 
   constructor() {
   }
@@ -536,7 +598,7 @@ class Score {
   #dom;
   constructor(aMinMoves = 18) {
     document.body.classList.remove("win");
-    this.#minMoves = 18;
+    this.#minMoves = aMinMoves;
     this.#movesTaken = 0;
     this.#dom = document.getElementById("score");
     this.#dom.innerHTML = ""; // Fastest removeAllChildren
@@ -624,8 +686,21 @@ function updateGameScoreUI() {
   document.getElementById("game-score-number").textContent = localStorage.getItem("game.score") ?? 0;
 }
 
+const OBSCURE_NUTS_CHANCE = 0.5;
 function newLevel() {
-  document.querySelector(".level").replaceWith(new Level().dom);
+  const stars = parseInt(localStorage.getItem("game.score") ?? 0);
+  const maxDifficulty = (Colour.COLOURS.size - 5) / 2 + 1;
+  let difficulty = Level.difficultyFor(stars);
+  if (difficulty > maxDifficulty) {
+    console.warn(`Clamping difficulty from ${difficulty} to ${maxDifficulty}!`);
+    difficulty = maxDifficulty;
+  }
+  const numBolts = 5 + (2 * difficulty);
+  const boltHeight = 4;
+  const numColours = numBolts - 2;
+  const obscureNuts = Math.random() < OBSCURE_NUTS_CHANCE;
+  const level = new Level(numBolts, boltHeight, numColours, obscureNuts);
+  document.querySelector(".level").replaceWith(level.dom);
 };
 
 document.getElementById("new-game").addEventListener("click", newLevel);
